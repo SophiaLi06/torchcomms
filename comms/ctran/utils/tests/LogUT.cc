@@ -105,6 +105,34 @@ TEST_F(CtranUtilsLogTest, TestCtranErrEvaluatesArgumentsOnce) {
       testing::HasSubstr("CTRAN error 1"));
 }
 
+TEST_F(CtranUtilsLogTest, TestCtranDbg5UsesTraceLevel) {
+  EXPECT_EQ(
+      meta::comms::logger::loggerLevelToSpdlogLevel(
+          meta::comms::logger::LogLevel::TRACE),
+      spdlog::level::trace);
+
+  auto& logger =
+      meta::comms::logger::getSpdlogLogger(ctran::logging::kCtranLoggerName);
+  logger.configure("CTRAN", []() { return 0; }, {}, false);
+
+  int argumentEvaluations = 0;
+  testing::internal::CaptureStdout();
+  logger.set_level(spdlog::level::debug);
+  CTRAN_LOG(DBG5, "suppressed trace {}", ++argumentEvaluations);
+  CTRAN_LOG_STREAM(DBG5) << "suppressed trace " << ++argumentEvaluations;
+
+  logger.set_level(spdlog::level::trace);
+  CTRAN_LOG(DBG5, "enabled trace {}", ++argumentEvaluations);
+  CTRAN_LOG_STREAM(DBG5) << "enabled trace " << ++argumentEvaluations;
+  logger.flush();
+  const auto output = testing::internal::GetCapturedStdout();
+
+  EXPECT_EQ(argumentEvaluations, 2);
+  EXPECT_THAT(output, testing::Not(testing::HasSubstr("suppressed trace")));
+  EXPECT_THAT(output, testing::HasSubstr("enabled trace 1"));
+  EXPECT_THAT(output, testing::HasSubstr("enabled trace 2"));
+}
+
 TEST_F(CtranUtilsLogTest, TestCtranLogFirstNPreservesEnabledBudget) {
   auto& logger =
       meta::comms::logger::getSpdlogLogger(ctran::logging::kCtranLoggerName);
